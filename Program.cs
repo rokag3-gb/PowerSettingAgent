@@ -4,8 +4,6 @@ public class Program
 {
     static void Main(string[] args)
     {
-        //Console.WriteLine("Hello, World!");
-
         try
         {
             // 현재 설정 확인
