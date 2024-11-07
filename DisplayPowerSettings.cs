@@ -1,8 +1,9 @@
 ﻿namespace PowerSettingAgent;
 
+using System;
 using System.Runtime.InteropServices;
 
-public class DisplayPowerSettings
+public static class PowerDisplaySettings
 {
     // Windows API 함수 선언
     [DllImport("powrprof.dll")]
@@ -13,8 +14,16 @@ public class DisplayPowerSettings
         ref Guid SubGroupOfPowerSettingsGuid, ref Guid PowerSettingGuid, uint AcValueIndex);
 
     [DllImport("powrprof.dll")]
+    private static extern uint PowerWriteDCValueIndex(IntPtr RootPowerKey, ref Guid SchemeGuid,
+        ref Guid SubGroupOfPowerSettingsGuid, ref Guid PowerSettingGuid, uint DcValueIndex);
+
+    [DllImport("powrprof.dll")]
     private static extern uint PowerReadACValueIndex(IntPtr RootPowerKey, ref Guid SchemeGuid,
         ref Guid SubGroupOfPowerSettingsGuid, ref Guid PowerSettingGuid, out uint AcValueIndex);
+
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerReadDCValueIndex(IntPtr RootPowerKey, ref Guid SchemeGuid,
+        ref Guid SubGroupOfPowerSettingsGuid, ref Guid PowerSettingGuid, out uint DcValueIndex);
 
     // 디스플레이 설정 관련 GUID
     private static Guid GUID_VIDEO_SUBGROUP = new Guid("7516b95f-f776-4464-8c53-06167f40cc99");
@@ -24,13 +33,23 @@ public class DisplayPowerSettings
     public const uint NEVER_TIMEOUT = 0xFFFFFFFF;  // "해당 없음" 설정값
 
     /// <summary>
+    /// 전원 타입을 나타내는 열거형
+    /// </summary>
+    public enum PowerType
+    {
+        AC,     // 전원 사용
+        DC      // 배터리 사용
+    }
+
+    /// <summary>
     /// 현재 디스플레이 끄기 설정을 가져옵니다.
     /// </summary>
+    /// <param name="powerType">전원 타입 (AC: 전원 사용, DC: 배터리 사용)</param>
     /// <returns>
-    /// 음수: "해당 없음" 설정
+    /// -1: "해당 없음" 설정
     /// 0 이상: 설정된 시간(분)
     /// </returns>
-    public static int GetDisplayTimeout()
+    public static int GetDisplayTimeout(PowerType powerType)
     {
         try
         {
@@ -41,14 +60,29 @@ public class DisplayPowerSettings
             }
 
             Guid activeScheme = Marshal.PtrToStructure<Guid>(activeSchemeGuid);
+            uint timeoutSeconds;
 
-            result = PowerReadACValueIndex(
-                IntPtr.Zero,
-                ref activeScheme,
-                ref GUID_VIDEO_SUBGROUP,
-                ref GUID_VIDEO_POWERDOWN_TIMEOUT,
-                out uint timeoutSeconds
-            );
+            // 전원 타입에 따라 다른 함수 호출
+            if (powerType == PowerType.AC)
+            {
+                result = PowerReadACValueIndex(
+                    IntPtr.Zero,
+                    ref activeScheme,
+                    ref GUID_VIDEO_SUBGROUP,
+                    ref GUID_VIDEO_POWERDOWN_TIMEOUT,
+                    out timeoutSeconds
+                );
+            }
+            else
+            {
+                result = PowerReadDCValueIndex(
+                    IntPtr.Zero,
+                    ref activeScheme,
+                    ref GUID_VIDEO_SUBGROUP,
+                    ref GUID_VIDEO_POWERDOWN_TIMEOUT,
+                    out timeoutSeconds
+                );
+            }
 
             Marshal.FreeHGlobal(activeSchemeGuid);
 
@@ -60,7 +94,7 @@ public class DisplayPowerSettings
             // "해당 없음" 설정 확인
             if (timeoutSeconds == NEVER_TIMEOUT)
             {
-                return -1;  // "해당 없음"을 나타내는 특별한 값
+                return -1;
             }
 
             return (int)(timeoutSeconds / 60);
@@ -78,7 +112,8 @@ public class DisplayPowerSettings
     /// -1: "해당 없음" 설정
     /// 0 이상: 설정할 시간(분)
     /// </param>
-    public static void SetDisplayTimeout(int minutes)
+    /// <param name="powerType">전원 타입 (AC: 전원 사용, DC: 배터리 사용)</param>
+    public static void SetDisplayTimeout(int minutes, PowerType powerType)
     {
         if (minutes < -1)
         {
@@ -94,17 +129,29 @@ public class DisplayPowerSettings
             }
 
             Guid activeScheme = Marshal.PtrToStructure<Guid>(activeSchemeGuid);
-
-            // 설정할 값 결정
             uint timeoutValue = (minutes == -1) ? NEVER_TIMEOUT : (uint)(minutes * 60);
 
-            result = PowerWriteACValueIndex(
-                IntPtr.Zero,
-                ref activeScheme,
-                ref GUID_VIDEO_SUBGROUP,
-                ref GUID_VIDEO_POWERDOWN_TIMEOUT,
-                timeoutValue
-            );
+            // 전원 타입에 따라 다른 함수 호출
+            if (powerType == PowerType.AC)
+            {
+                result = PowerWriteACValueIndex(
+                    IntPtr.Zero,
+                    ref activeScheme,
+                    ref GUID_VIDEO_SUBGROUP,
+                    ref GUID_VIDEO_POWERDOWN_TIMEOUT,
+                    timeoutValue
+                );
+            }
+            else
+            {
+                result = PowerWriteDCValueIndex(
+                    IntPtr.Zero,
+                    ref activeScheme,
+                    ref GUID_VIDEO_SUBGROUP,
+                    ref GUID_VIDEO_POWERDOWN_TIMEOUT,
+                    timeoutValue
+                );
+            }
 
             Marshal.FreeHGlobal(activeSchemeGuid);
 
@@ -122,9 +169,11 @@ public class DisplayPowerSettings
     /// <summary>
     /// 현재 설정을 문자열로 반환합니다.
     /// </summary>
-    public static string GetDisplayTimeoutString()
+    public static string GetDisplayTimeoutString(PowerType powerType)
     {
-        int timeout = GetDisplayTimeout();
-        return timeout == -1 ? "해당 없음" : $"{timeout}분";
+        int timeout = GetDisplayTimeout(powerType);
+        string powerTypeStr = powerType == PowerType.AC ? "전원 사용" : "배터리 사용";
+        string timeoutStr = timeout == -1 ? "해당 없음" : $"{timeout}분";
+        return $"{powerTypeStr}: {timeoutStr}";
     }
 }
