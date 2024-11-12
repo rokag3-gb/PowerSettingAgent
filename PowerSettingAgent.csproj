@@ -14,10 +14,9 @@
     <EventSourceSupport>false</EventSourceSupport>
     <UseSystemResourceKeys>true</UseSystemResourceKeys>
     <DebuggerSupport>false</DebuggerSupport>
-    
-    <InvariantGlobalization>true</InvariantGlobalization>
-    <!--<RuntimeIdentifiers>win-x64</RuntimeIdentifiers>-->
-    <RuntimeIdentifier>osx-arm64</RuntimeIdentifier>
+
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <!--<RuntimeIdentifier>osx-arm64</RuntimeIdentifier>-->
 
     <!-- 최적화 설정 -->
     <OptimizationPreference>Speed</OptimizationPreference>
